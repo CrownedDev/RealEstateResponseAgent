@@ -86,6 +86,163 @@ app.get('/test/agents', async (req, res) => {
   }
 });
 
+// Test endpoint - delete all agents (TESTING ONLY)
+app.delete('/test/agents', async (req, res) => {
+  try {
+    const Agent = require('./src/models/Agent');
+    const result = await Agent.deleteMany({});
+
+    res.json({
+      success: true,
+      message: `Deleted ${result.deletedCount} agents`,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// Test endpoint - create a property
+app.post('/test/property', async (req, res) => {
+  try {
+    const Agent = require('./src/models/Agent');
+    const Property = require('./src/models/Property');
+
+    // Get first agent
+    const agent = await Agent.findOne();
+    if (!agent) {
+      return res.status(400).json({
+        success: false,
+        error: 'No agent found. Create an agent first.',
+      });
+    }
+
+    const property = await Property.create({
+      agentId: agent._id,
+      externalRef: 'PROP001',
+      title: 'Beautiful 3-Bed Victorian House',
+      description:
+        'Stunning period property in prime location with original features, modern kitchen, and spacious garden.',
+      address: {
+        line1: '123 High Street',
+        city: 'London',
+        postcode: 'SW1A 1AA',
+      },
+      type: 'house',
+      bedrooms: 3,
+      bathrooms: 2,
+      price: {
+        amount: 750000,
+      },
+      features: ['Garden', 'Parking', 'Period Features', 'Modern Kitchen'],
+      epcRating: 'C',
+      status: 'available',
+    });
+
+    res.json({
+      success: true,
+      message: 'Property created successfully',
+      property: {
+        id: property._id,
+        title: property.title,
+        address: property.address,
+        bedrooms: property.bedrooms,
+        price: property.price,
+        status: property.status,
+      },
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// Test endpoint - get all properties
+app.get('/test/properties', async (req, res) => {
+  try {
+    const Property = require('./src/models/Property');
+    const properties = await Property.find({ deletedAt: null }).populate(
+      'agentId',
+      'companyName email'
+    );
+
+    res.json({
+      success: true,
+      count: properties.length,
+      properties: properties.map((p) => ({
+        id: p._id,
+        title: p.title,
+        address: `${p.address.line1}, ${p.address.city}`,
+        bedrooms: p.bedrooms,
+        price: `£${p.price.amount.toLocaleString()}`,
+        status: p.status,
+        agent: p.agentId?.companyName,
+      })),
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// Test endpoint - search properties
+app.get('/test/properties/search', async (req, res) => {
+  try {
+    const Property = require('./src/models/Property');
+    const { bedrooms, maxPrice, city } = req.query;
+
+    const query = { status: 'available', deletedAt: null };
+
+    if (bedrooms) query.bedrooms = parseInt(bedrooms);
+    if (maxPrice) query['price.amount'] = { $lte: parseInt(maxPrice) };
+    if (city) query['address.city'] = new RegExp(city, 'i');
+
+    const properties = await Property.find(query);
+
+    res.json({
+      success: true,
+      count: properties.length,
+      query: { bedrooms, maxPrice, city },
+      properties: properties.map((p) => ({
+        id: p._id,
+        title: p.title,
+        address: `${p.address.line1}, ${p.address.city}`,
+        bedrooms: p.bedrooms,
+        price: `£${p.price.amount.toLocaleString()}`,
+      })),
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// Test endpoint - delete all properties
+app.delete('/test/properties', async (req, res) => {
+  try {
+    const Property = require('./src/models/Property');
+    const result = await Property.deleteMany({});
+
+    res.json({
+      success: true,
+      message: `Deleted ${result.deletedCount} properties`,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 // Root endpoint
 app.get('/', (req, res) => {
   res.json({
