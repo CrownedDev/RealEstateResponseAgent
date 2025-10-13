@@ -26,6 +26,66 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Test endpoint - create an agent
+app.post('/test/agent', async (req, res) => {
+  try {
+    const Agent = require('./src/models/Agent');
+
+    const agent = await Agent.create({
+      companyName: 'Smith & Sons Estate Agents',
+      email: 'test@smithandsons.com',
+      phone: '07700900123',
+      subscription: {
+        conversationLimit: 500,
+        monthlyPrice: 1000,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Agent created successfully',
+      agent: {
+        id: agent._id,
+        companyName: agent.companyName,
+        slug: agent.slug,
+        email: agent.email,
+        status: agent.status,
+        subscription: agent.subscription,
+      },
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// Test endpoint - get all agents
+app.get('/test/agents', async (req, res) => {
+  try {
+    const Agent = require('./src/models/Agent');
+    const agents = await Agent.find({ deletedAt: null });
+
+    res.json({
+      success: true,
+      count: agents.length,
+      agents: agents.map((a) => ({
+        id: a._id,
+        companyName: a.companyName,
+        slug: a.slug,
+        email: a.email,
+        status: a.status,
+      })),
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 // Root endpoint
 app.get('/', (req, res) => {
   res.json({
