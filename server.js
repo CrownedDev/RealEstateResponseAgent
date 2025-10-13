@@ -529,6 +529,192 @@ app.delete('/test/bookings', async (req, res) => {
   }
 });
 
+// Test endpoint - create a conversation
+app.post('/test/conversation', async (req, res) => {
+  try {
+    const Agent = require('./src/models/Agent');
+    const Lead = require('./src/models/Lead');
+    const Conversation = require('./src/models/Conversation');
+
+    const agent = await Agent.findOne();
+    const lead = await Lead.findOne();
+
+    if (!agent) {
+      return res.status(400).json({
+        success: false,
+        error: 'No agent found',
+      });
+    }
+
+    const now = new Date();
+    const threeMinutesAgo = new Date(now.getTime() - 3 * 60 * 1000);
+
+    const conversation = await Conversation.create({
+      agentId: agent._id,
+      leadId: lead?._id,
+      externalId: 'vf_conv_' + Date.now(),
+      channel: 'webchat',
+      customer: {
+        phone: '07700900456',
+        identifier: '192.168.1.100',
+      },
+      startedAt: threeMinutesAgo,
+      endedAt: now,
+      messages: [
+        {
+          role: 'assistant',
+          content: 'Hello! How can I help you today?',
+          timestamp: threeMinutesAgo,
+        },
+        {
+          role: 'user',
+          content: "I'm looking for a 3 bedroom house in London",
+          timestamp: new Date(threeMinutesAgo.getTime() + 10000),
+        },
+        {
+          role: 'assistant',
+          content: "Great! What's your budget?",
+          timestamp: new Date(threeMinutesAgo.getTime() + 15000),
+        },
+        {
+          role: 'user',
+          content: 'Around £750,000',
+          timestamp: new Date(threeMinutesAgo.getTime() + 25000),
+        },
+        {
+          role: 'assistant',
+          content:
+            'Perfect! I found a beautiful 3-bed Victorian house at 123 High Street for £750,000. Would you like to book a viewing?',
+          timestamp: new Date(threeMinutesAgo.getTime() + 30000),
+        },
+        {
+          role: 'user',
+          content: 'Yes please!',
+          timestamp: new Date(threeMinutesAgo.getTime() + 40000),
+        },
+      ],
+      summary:
+        'Customer looking for 3-bed house in London with £750k budget. Interested in property at 123 High Street. Booking requested.',
+      intent: {
+        primary: 'property_search',
+        confidence: 0.95,
+      },
+      outcome: 'booking_made',
+      metrics: {
+        sentiment: 'positive',
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Conversation created successfully',
+      conversation: {
+        id: conversation._id,
+        channel: conversation.channel,
+        duration: conversation.duration + ' seconds',
+        messageCount: conversation.metrics.messageCount,
+        userMessages: conversation.metrics.userMessageCount,
+        assistantMessages: conversation.metrics.assistantMessageCount,
+        outcome: conversation.outcome,
+        summary: conversation.summary,
+      },
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// Test endpoint - get all conversations
+app.get('/test/conversations', async (req, res) => {
+  try {
+    const Conversation = require('./src/models/Conversation');
+    const conversations = await Conversation.find({ deletedAt: null })
+      .populate('agentId', 'companyName')
+      .populate('leadId', 'contact')
+      .sort({ startedAt: -1 })
+      .limit(10);
+
+    res.json({
+      success: true,
+      count: conversations.length,
+      conversations: conversations.map((c) => ({
+        id: c._id,
+        channel: c.channel,
+        startedAt: c.startedAt,
+        duration: c.duration ? c.duration + 's' : 'ongoing',
+        messages: c.metrics?.messageCount || 0,
+        outcome: c.outcome,
+        sentiment: c.metrics?.sentiment,
+        agent: c.agentId?.companyName,
+      })),
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// Test endpoint - get conversation details
+app.get('/test/conversation/:id', async (req, res) => {
+  try {
+    const Conversation = require('./src/models/Conversation');
+    const conversation = await Conversation.findById(req.params.id)
+      .populate('agentId', 'companyName email')
+      .populate('leadId', 'contact');
+
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        error: 'Conversation not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      conversation: {
+        id: conversation._id,
+        channel: conversation.channel,
+        startedAt: conversation.startedAt,
+        endedAt: conversation.endedAt,
+        duration: conversation.duration + ' seconds',
+        summary: conversation.summary,
+        outcome: conversation.outcome,
+        messages: conversation.messages,
+        agent: conversation.agentId,
+        lead: conversation.leadId,
+      },
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// Test endpoint - delete all conversations
+app.delete('/test/conversations', async (req, res) => {
+  try {
+    const Conversation = require('./src/models/Conversation');
+    const result = await Conversation.deleteMany({});
+
+    res.json({
+      success: true,
+      message: `Deleted ${result.deletedCount} conversations`,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 // Root endpoint
 app.get('/', (req, res) => {
   res.json({
