@@ -164,6 +164,9 @@ const cancelBooking = async (req, res, next) => {
 // @desc    Check availability
 // @route   GET /api/v1/bookings/availability
 // @access  Private
+// @desc    Check availability
+// @route   GET /api/v1/bookings/availability
+// @access  Private
 const checkAvailability = async (req, res, next) => {
   try {
     const { date } = req.query;
@@ -192,15 +195,35 @@ const checkAvailability = async (req, res, next) => {
       allSlots.push(`${hour.toString().padStart(2, '0')}:30`);
     }
 
-    // Remove booked slots
+    // Extract booked time slots (convert from UTC to local time)
     const bookedSlots = bookings.map((b) => {
-      const hours = b.scheduledDate.getHours();
-      const mins = b.scheduledDate.getMinutes();
+      const localDate = new Date(b.scheduledDate);
+      const hours = localDate.getHours();
+      const mins = localDate.getMinutes();
       return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
     });
 
+    // Also mark the slot after (for duration)
+    const bookedSlotsWithDuration = [...bookedSlots];
+    bookings.forEach((b) => {
+      const localDate = new Date(b.scheduledDate);
+      const endTime = new Date(localDate.getTime() + b.duration * 60000);
+
+      // Mark all 30-min slots covered by this booking
+      let currentTime = new Date(localDate);
+      while (currentTime < endTime) {
+        const hours = currentTime.getHours();
+        const mins = currentTime.getMinutes();
+        const slot = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+        if (!bookedSlotsWithDuration.includes(slot)) {
+          bookedSlotsWithDuration.push(slot);
+        }
+        currentTime = new Date(currentTime.getTime() + 30 * 60000); // Add 30 mins
+      }
+    });
+
     const availableSlots = allSlots.filter(
-      (slot) => !bookedSlots.includes(slot)
+      (slot) => !bookedSlotsWithDuration.includes(slot)
     );
 
     res.json({
@@ -209,6 +232,7 @@ const checkAvailability = async (req, res, next) => {
       availableSlots,
       bookedSlots: bookings.map((b) => ({
         time: b.scheduledDate,
+        duration: `${b.duration} mins`,
         customer: b.customer.name,
         property: b.property.address,
       })),
