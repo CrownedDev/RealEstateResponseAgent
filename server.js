@@ -243,6 +243,129 @@ app.delete('/test/properties', async (req, res) => {
   }
 });
 
+// Test endpoint - create a lead
+app.post('/test/lead', async (req, res) => {
+  try {
+    const Agent = require('./src/models/Agent');
+    const Property = require('./src/models/Property');
+    const Lead = require('./src/models/Lead');
+
+    const agent = await Agent.findOne();
+    const property = await Property.findOne();
+
+    if (!agent) {
+      return res.status(400).json({
+        success: false,
+        error: 'No agent found. Create an agent first.',
+      });
+    }
+
+    const lead = await Lead.create({
+      agentId: agent._id,
+      contact: {
+        firstName: 'John',
+        lastName: 'Smith',
+        email: 'john.smith@email.com',
+        phone: '07700900456',
+        preferredContact: 'email',
+      },
+      propertyInterest: property
+        ? {
+            propertyId: property._id,
+            propertyRef: property.externalRef,
+            propertyAddress: `${property.address.line1}, ${property.address.city}`,
+            propertyPrice: property.price.amount,
+          }
+        : undefined,
+      requirements: {
+        bedrooms: 3,
+        maxBudget: 800000,
+        location: 'London',
+        mustHaves: ['Garden', 'Parking'],
+      },
+      source: {
+        channel: 'webchat',
+      },
+      conversation: {
+        conversationId: 'conv_123456',
+        summary:
+          'Customer looking for 3-bed house in London with garden and parking. Budget up to £800k.',
+        duration: 180,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Lead created successfully',
+      lead: {
+        id: lead._id,
+        name: lead.contact.fullName,
+        email: lead.contact.email,
+        phone: lead.contact.phone,
+        propertyInterest: lead.propertyInterest?.propertyAddress,
+        score: lead.score.value,
+        status: lead.status,
+        priority: lead.priority,
+      },
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// Test endpoint - get all leads
+app.get('/test/leads', async (req, res) => {
+  try {
+    const Lead = require('./src/models/Lead');
+    const leads = await Lead.find({ deletedAt: null })
+      .populate('agentId', 'companyName')
+      .populate('propertyInterest.propertyId', 'title address')
+      .sort({ 'score.value': -1 });
+
+    res.json({
+      success: true,
+      count: leads.length,
+      leads: leads.map((l) => ({
+        id: l._id,
+        name: l.contact.fullName,
+        email: l.contact.email,
+        phone: l.contact.phone,
+        score: l.score.value,
+        status: l.status,
+        priority: l.priority,
+        channel: l.source.channel,
+        agent: l.agentId?.companyName,
+      })),
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// Test endpoint - delete all leads
+app.delete('/test/leads', async (req, res) => {
+  try {
+    const Lead = require('./src/models/Lead');
+    const result = await Lead.deleteMany({});
+
+    res.json({
+      success: true,
+      message: `Deleted ${result.deletedCount} leads`,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 // Root endpoint
 app.get('/', (req, res) => {
   res.json({
