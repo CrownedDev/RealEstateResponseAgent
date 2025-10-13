@@ -366,6 +366,169 @@ app.delete('/test/leads', async (req, res) => {
   }
 });
 
+// Test endpoint - create a booking
+app.post('/test/booking', async (req, res) => {
+  try {
+    const Agent = require('./src/models/Agent');
+    const Lead = require('./src/models/Lead');
+    const Property = require('./src/models/Property');
+    const Booking = require('./src/models/Booking');
+
+    const agent = await Agent.findOne();
+    const lead = await Lead.findOne();
+    const property = await Property.findOne();
+
+    if (!agent || !lead || !property) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required data. Create agent, lead, and property first.',
+      });
+    }
+
+    // Book for tomorrow at 2pm
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(14, 0, 0, 0);
+
+    const booking = await Booking.create({
+      agentId: agent._id,
+      leadId: lead._id,
+      propertyId: property._id,
+      type: 'viewing',
+      scheduledDate: tomorrow,
+      duration: 30,
+      customer: {
+        name: lead.contact.firstName + ' ' + (lead.contact.lastName || ''),
+        phone: lead.contact.phone,
+        email: lead.contact.email,
+      },
+      property: {
+        address: `${property.address.line1}, ${property.address.city}`,
+        reference: property.externalRef,
+      },
+      status: 'confirmed',
+    });
+
+    res.json({
+      success: true,
+      message: 'Booking created successfully',
+      booking: {
+        id: booking._id,
+        type: booking.type,
+        scheduledDate: booking.scheduledDate,
+        duration: booking.duration,
+        endDate: booking.endDate,
+        customer: booking.customer,
+        property: booking.property,
+        status: booking.status,
+      },
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// Test endpoint - get all bookings
+app.get('/test/bookings', async (req, res) => {
+  try {
+    const Booking = require('./src/models/Booking');
+    const bookings = await Booking.find({ deletedAt: null })
+      .populate('agentId', 'companyName')
+      .populate('leadId', 'contact')
+      .populate('propertyId', 'title address')
+      .sort({ scheduledDate: 1 });
+
+    res.json({
+      success: true,
+      count: bookings.length,
+      bookings: bookings.map((b) => ({
+        id: b._id,
+        type: b.type,
+        scheduledDate: b.scheduledDate,
+        duration: `${b.duration} mins`,
+        customer: b.customer.name,
+        property: b.property.address,
+        status: b.status,
+        agent: b.agentId?.companyName,
+      })),
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// Test endpoint - check availability
+app.get('/test/bookings/availability', async (req, res) => {
+  try {
+    const Agent = require('./src/models/Agent');
+    const Booking = require('./src/models/Booking');
+
+    const agent = await Agent.findOne();
+    if (!agent) {
+      return res.status(400).json({
+        success: false,
+        error: 'No agent found',
+      });
+    }
+
+    // Get bookings for next 7 days
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const nextWeek = new Date(today);
+    nextWeek.setDate(nextWeek.getDate() + 7);
+
+    const bookings = await Booking.find({
+      agentId: agent._id,
+      scheduledDate: { $gte: today, $lt: nextWeek },
+      status: { $in: ['pending', 'confirmed'] },
+      deletedAt: null,
+    }).sort({ scheduledDate: 1 });
+
+    res.json({
+      success: true,
+      period: {
+        from: today,
+        to: nextWeek,
+      },
+      bookedSlots: bookings.map((b) => ({
+        date: b.scheduledDate,
+        duration: b.duration,
+        customer: b.customer.name,
+        property: b.property.address,
+      })),
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// Test endpoint - delete all bookings
+app.delete('/test/bookings', async (req, res) => {
+  try {
+    const Booking = require('./src/models/Booking');
+    const result = await Booking.deleteMany({});
+
+    res.json({
+      success: true,
+      message: `Deleted ${result.deletedCount} bookings`,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 // Root endpoint
 app.get('/', (req, res) => {
   res.json({
