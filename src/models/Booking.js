@@ -13,7 +13,7 @@ const bookingSchema = new mongoose.Schema(
     leadId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Lead',
-      required: true,
+      // Not required - customer can book without being a lead first
     },
 
     propertyId: {

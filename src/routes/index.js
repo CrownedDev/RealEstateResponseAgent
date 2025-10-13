@@ -6,12 +6,14 @@ const agentRoutes = require('./agents');
 const propertyRoutes = require('./properties');
 const leadRoutes = require('./leads');
 const bookingRoutes = require('./bookings');
+const webhookRoutes = require('./webhooks');
 
 // Mount routes
 router.use('/agents', agentRoutes);
 router.use('/properties', propertyRoutes);
 router.use('/leads', leadRoutes);
 router.use('/bookings', bookingRoutes);
+router.use('/webhooks', webhookRoutes);
 
 // API info endpoint
 router.get('/', (req, res) => {
@@ -25,6 +27,14 @@ router.get('/', (req, res) => {
       leads: '/api/v1/leads',
       bookings: '/api/v1/bookings',
       webhooks: '/api/v1/webhooks',
+    },
+    webhookEndpoints: {
+      captureLead: 'POST /api/v1/webhooks/lead',
+      searchProperties: 'POST /api/v1/webhooks/search-properties',
+      getProperty: 'GET /api/v1/webhooks/property/:id',
+      createBooking: 'POST /api/v1/webhooks/booking',
+      checkAvailability: 'POST /api/v1/webhooks/check-availability',
+      logConversation: 'POST /api/v1/webhooks/conversation',
     },
   });
 });
