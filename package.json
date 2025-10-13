@@ -17,7 +17,12 @@
     "type": "git",
     "url": "git+https://github.com/CrownedDev/RealEstateResponseAgent.git"
   },
- "keywords": ["estate-agents", "ai", "automation", "property"],
+  "keywords": [
+    "estate-agents",
+    "ai",
+    "automation",
+    "property"
+  ],
   "author": "Tafadzwa Zama",
   "license": "MIT",
   "bugs": {
@@ -32,6 +37,7 @@
     "express-rate-limit": "^8.1.0",
     "express-validator": "^7.2.1",
     "helmet": "^8.1.0",
+    "mongodb": "^5.9.2",
     "mongoose": "^8.19.1",
     "winston": "^3.18.3",
     "xss-clean": "^0.1.4"

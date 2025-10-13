@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const { connectDB } = require('./src/config/database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -14,12 +15,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Request logging (simple version for now)
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
-  next();
-});
-
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
@@ -27,6 +22,7 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
     version: '1.0.0',
+    database: 'connected',
   });
 });
 
@@ -36,72 +32,34 @@ app.get('/', (req, res) => {
     message: 'Royal Response API',
     version: '1.0.0',
     status: 'running',
-    endpoints: {
-      health: '/health',
-      docs: '/api-docs',
-    },
-  });
-});
-
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    error: 'Route not found',
-    path: req.path,
-  });
-});
-
-// Global error handler
-app.use((err, req, res, next) => {
-  console.error('Error:', err);
-
-  res.status(err.statusCode || 500).json({
-    success: false,
-    error: err.message || 'Internal Server Error',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 });
 
 // Start server
-const server = app.listen(PORT, () => {
-  console.log('');
-  console.log('╔════════════════════════════════════════╗');
-  console.log('║     🚀 Royal Response API 🚀          ║');
-  console.log('╚════════════════════════════════════════╝');
-  console.log('');
-  console.log(`📡 Server:      http://localhost:${PORT}`);
-  console.log(`🏥 Health:      http://localhost:${PORT}/health`);
-  console.log(`📝 Environment: ${process.env.NODE_ENV}`);
-  console.log(`⏰ Started:     ${new Date().toLocaleString()}`);
-  console.log('');
-  console.log('Press CTRL+C to stop');
-  console.log('');
-});
+const startServer = async () => {
+  try {
+    // Connect to database first
+    await connectDB();
 
-// Graceful shutdown
-const gracefulShutdown = (signal) => {
-  console.log(`\n${signal} received. Starting graceful shutdown...`);
-
-  server.close(() => {
-    console.log('✅ HTTP server closed');
-    process.exit(0);
-  });
-
-  // Force shutdown after 10 seconds
-  setTimeout(() => {
-    console.error('❌ Forced shutdown after timeout');
+    // Then start server
+    app.listen(PORT, () => {
+      console.log('');
+      console.log('🚀 Royal Response API');
+      console.log('📡 Server running on port', PORT);
+      console.log('🏥 Health:', `http://localhost:${PORT}/health`);
+      console.log('📝 Environment:', process.env.NODE_ENV);
+      console.log('');
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
     process.exit(1);
-  }, 10000);
+  }
 };
 
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+startServer();
 
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (err) => {
-  console.error('❌ Unhandled Promise Rejection:', err);
-  process.exit(1);
+// Handle shutdown
+process.on('SIGINT', () => {
+  console.log('\n👋 Shutting down gracefully...');
+  process.exit(0);
 });
-
-module.exports = app; // For testing
