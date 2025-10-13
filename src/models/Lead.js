@@ -58,6 +58,19 @@ const leadSchema = new mongoose.Schema(
       mustHaves: [String],
     },
 
+    timeline: {
+      type: String,
+      enum: ['immediate', 'short-term', 'medium-term', 'long-term', 'flexible'],
+    },
+    financials: {
+      mortgageApproval: {
+        type: String,
+        enum: ['none', 'in-progress', 'approved'],
+      },
+      budget: Number,
+      deposit: Number,
+    },
+
     // Lead Score (0-100)
     score: {
       value: {
@@ -141,7 +154,20 @@ const leadSchema = new mongoose.Schema(
 // Indexes
 leadSchema.index({ agentId: 1, status: 1 });
 leadSchema.index({ agentId: 1, 'score.value': -1 });
-leadSchema.index({ agentId: 1, priority: 1, createdAt: -1 });
+leadSchema.methods.setPriority = function () {
+  // Urgent: Immediate timeline + high score = act NOW
+  if (this.timeline === 'immediate' && this.score.value >= 75) {
+    console.log('Setting URGENT');
+    this.priority = 'urgent';
+  } else if (this.score.value >= 75) {
+    console.log('Setting HIGH');
+    this.priority = 'high';
+  } else if (this.score.value >= 50) {
+    this.priority = 'medium';
+  } else {
+    this.priority = 'low';
+  }
+};
 leadSchema.index({ 'contact.email': 1 });
 leadSchema.index({ 'contact.phone': 1 });
 
@@ -188,8 +214,14 @@ leadSchema.methods.calculateScore = function () {
 
 // Auto-calculate score before saving
 leadSchema.pre('save', function (next) {
-  if (this.isNew || this.isModified()) {
+  if (
+    this.isModified('contact') ||
+    this.isModified('propertyInterest') ||
+    this.isModified('financials') ||
+    this.isModified('timeline')
+  ) {
     this.calculateScore();
+    this.setPriority();
   }
   next();
 });

@@ -1,17 +1,16 @@
 const mongoose = require('mongoose');
+const { logger } = require('../middleware/logger');
 
 let isConnected = false;
 
 const connectDB = async () => {
   if (isConnected) {
-    console.log('📊 Using existing database connection');
+    logger.info('📊 Using existing database connection');
     return;
   }
 
   try {
     const options = {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
@@ -20,20 +19,20 @@ const connectDB = async () => {
     await mongoose.connect(process.env.MONGODB_URI, options);
     isConnected = true;
 
-    console.log('✅ MongoDB connected successfully');
-    console.log('📊 Database:', mongoose.connection.name);
+    logger.info('✅ MongoDB connected successfully');
+    logger.info(`📊 Database: ${mongoose.connection.name}`);
 
     // Handle connection events
     mongoose.connection.on('error', (err) => {
-      console.error('❌ MongoDB connection error:', err);
+      logger.error('❌ MongoDB connection error:', err);
     });
 
     mongoose.connection.on('disconnected', () => {
-      console.log('⚠️  MongoDB disconnected');
+      logger.warn('⚠️  MongoDB disconnected');
       isConnected = false;
     });
   } catch (error) {
-    console.error('❌ MongoDB connection failed:', error.message);
+    logger.error('❌ MongoDB connection failed:', error.message);
     process.exit(1);
   }
 };

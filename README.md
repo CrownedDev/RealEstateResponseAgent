@@ -1,23 +1,25 @@
 # Royal Response API
 
-24/7 AI Response System for UK Estate Agents
+24/7 AI Response System for UK Estate Agents - Production-grade RESTful API with webhook endpoints for Voiceflow integration.
 
-## Prerequisites
+## 🚀 Features
+
+- **Multi-tenant architecture** - Isolated data per estate agent
+- **Automatic lead scoring** - AI-powered lead qualification (0-100 score)
+- **Booking conflict detection** - Prevents double-bookings automatically
+- **Conversation logging** - Complete audit trail of all interactions
+- **Webhook-ready** - Purpose-built for Voiceflow/chatbot integration
+- **Production-grade** - Comprehensive error handling, logging, and validation
+
+## 📋 Prerequisites
 
 - Node.js >= 20.0.0
-- MongoDB (local or Atlas)
+- MongoDB Atlas account (or local MongoDB)
 - npm >= 10.0.0
 
-## Installation
+## 🔧 Installation
 
-1. Clone the repository
+1. **Clone the repository**
 ```bash
-git clone <your-repo-url>
-cd royal-response-api
-
-npm start - Run production server
-npm run dev - Run development server with hot reload
-npm test - Run tests in watch mode
-npm run lint - Check code quality
-npm run lint:fix - Fix linting issues
-npm run format - Format code with Prettier
+git clone https://github.com/CrownedDev/RealEstateResponseAgent.git
+cd RealEstateResponseAgent

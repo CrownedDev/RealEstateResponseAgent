@@ -1,25 +1,15 @@
+require('dotenv').config();
 const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
 
-let mongoServer;
-
-// Setup test database before all tests
+// Global setup - runs once before all tests
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
-  const mongoUri = mongoServer.getUri();
-  await mongoose.connect(mongoUri);
-});
-
-// Clear database between tests
-afterEach(async () => {
-  const collections = mongoose.connection.collections;
-  for (const key in collections) {
-    await collections[key].deleteMany();
+  // Only connect if not already connected
+  if (mongoose.connection.readyState === 0) {
+    await mongoose.connect(process.env.MONGODB_URI);
   }
-});
+}, 30000);
 
-// Cleanup after all tests
+// Global teardown - runs once after all tests
 afterAll(async () => {
-  await mongoose.disconnect();
-  await mongoServer.stop();
-});
+  await mongoose.connection.close();
+}, 30000);

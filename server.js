@@ -40,6 +40,19 @@ app.get('/', (req, res) => {
   });
 });
 
+// API Documentation
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./src/config/swagger');
+
+app.use(
+  '/api-docs',
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec, {
+    customSiteTitle: 'Royal Response API Docs',
+    customCss: '.swagger-ui .topbar { display: none }',
+  })
+);
+
 // API Routes (we'll add these next)
 app.use('/api/v1', require('./src/routes'));
 
