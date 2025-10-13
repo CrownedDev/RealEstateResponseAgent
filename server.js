@@ -41,7 +41,7 @@ app.get('/', (req, res) => {
 });
 
 // API Routes (we'll add these next)
-// app.use('/api/v1', require('./src/routes'));
+app.use('/api/v1', require('./src/routes'));
 
 // 404 handler (must be after all routes)
 app.use(notFound);
