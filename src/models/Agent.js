@@ -122,7 +122,7 @@ const agentSchema = new mongoose.Schema(
         number: String, // WhatsApp Business number
         businessId: String,
       },
-      sms: {
+      text: {
         enabled: { type: Boolean, default: true },
         number: String, // SMS sending number
       },
@@ -193,7 +193,7 @@ const agentSchema = new mongoose.Schema(
     settings: {
       leadNotifications: {
         email: { type: Boolean, default: true },
-        sms: { type: Boolean, default: false },
+        text: { type: Boolean, default: false },
         slack: { type: Boolean, default: false },
       },
       autoResponse: {

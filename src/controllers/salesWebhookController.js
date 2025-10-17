@@ -15,6 +15,7 @@ const captureSalesLead = async (req, res, next) => {
     const phone = req.body.phone;
     const current_crm = req.body.current_crm || req.body.crm;
     const monthly_enquiries = req.body.monthly_enquiries;
+    const challenges = req.body.challenges;
 
     const {
       website,
@@ -90,15 +91,9 @@ const captureSalesLead = async (req, res, next) => {
       email: email.toLowerCase(),
       phone: phone,
       industry: industry || 'real_estate',
+
       currentCRM: current_crm, // ✅ Map to camelCase
       monthlyEnquiries: monthly_enquiries, // ✅ Map to camelCase
-      numberOfBranches: branch_count || 1,
-      teamSize: team_size,
-      painPoints: Array.isArray(pain_points)
-        ? pain_points
-        : pain_points
-          ? [pain_points]
-          : [],
       channelsInterestedIn: Array.isArray(channels_needed)
         ? channels_needed
         : channels_needed
@@ -133,17 +128,20 @@ const captureSalesLead = async (req, res, next) => {
     else if (monthly_enquiries > 200) score += 20;
     else if (monthly_enquiries > 100) score += 10;
     if (current_crm === 'reapit') score += 15;
-    if (Array.isArray(pain_points) && pain_points.includes('after_hours'))
-      score += 15;
-    if (Array.isArray(pain_points) && pain_points.includes('response_time'))
-      score += 10;
-    if (team_size > 5) score += 10;
-    if (branch_count > 1) score += 10;
 
-    prospect.notes.push({
-      text: `New lead via ${channel || 'website form'}. Score: ${score}/100. Enquiries: ${monthly_enquiries || 'N/A'}/mo`,
-      addedBy: 'system',
-    });
+    if (challenges) {
+      // If challenges provided, add them to notes
+      prospect.notes.push({
+        text: `Initial challenges: ${challenges}`,
+        addedBy: 'system',
+      });
+    } else {
+      // Otherwise add the score-based note
+      prospect.notes.push({
+        text: `New lead via ${channel || 'website form'}. Score: ${score}/100. Enquiries: ${monthly_enquiries || 'N/A'}/mo`,
+        addedBy: 'system',
+      });
+    }
 
     await prospect.save();
     logger.info(`✅ Sales lead captured: ${email} - Score: ${score}`);

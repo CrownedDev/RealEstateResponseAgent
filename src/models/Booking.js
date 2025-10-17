@@ -77,7 +77,7 @@ const bookingSchema = new mongoose.Schema(
         sent: Boolean,
         sentAt: Date,
       },
-      customerSMS: {
+      customerText: {
         sent: Boolean,
         sentAt: Date,
       },

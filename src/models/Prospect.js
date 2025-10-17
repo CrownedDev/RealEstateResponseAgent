@@ -50,15 +50,8 @@ const prospectSchema = new mongoose.Schema(
     // Business Details
     currentCRM: {
       type: String,
-      enum: [
-        'reapit',
-        'alto',
-        'jupix',
-        'expert_agent',
-        'dezrez',
-        'none',
-        'other',
-      ],
+      trim: true,
+      lowercase: true,
     },
     monthlyEnquiries: {
       type: Number,
@@ -84,12 +77,12 @@ const prospectSchema = new mongoose.Schema(
     channelsInterestedIn: [
       {
         type: String,
-        enum: ['chat', 'phone', 'whatsapp', 'sms', 'email'],
+        enum: ['chat', 'phone', 'whatsapp', 'text', 'email'],
       },
     ],
     preferredContactMethod: {
       type: String,
-      enum: ['email', 'phone', 'whatsapp', 'sms'],
+      enum: ['email', 'phone', 'whatsapp', 'text'],
       default: 'email',
     },
 
