@@ -1,6 +1,5 @@
 // src/controllers/salesWebhookController.js
-// FIXED VERSION - Correct field names matching Prospect model
-
+const Prospect = require('../models/Prospect');
 const { AppError } = require('../middleware/errorHandler');
 const { logger } = require('../middleware/logger');
 
@@ -9,18 +8,20 @@ const { logger } = require('../middleware/logger');
 // @access  Public
 const captureSalesLead = async (req, res, next) => {
   try {
+    // Support BOTH Voiceflow (snake_case) AND frontend form (alternative names)
+    const company_name = req.body.company_name || req.body.company;
+    const contact_name = req.body.contact_name || req.body.name;
+    const email = req.body.email;
+    const phone = req.body.phone;
+    const current_crm = req.body.current_crm || req.body.crm;
+    const monthly_enquiries = req.body.monthly_enquiries;
+
     const {
-      company_name, // ← Input from frontend/Voiceflow (snake_case)
-      contact_name,
-      email,
-      phone,
       website,
       industry,
       business_type,
-      current_crm,
       team_size,
       branch_count,
-      monthly_enquiries,
       pain_points,
       channels_needed,
       preferred_contact,
@@ -37,15 +38,19 @@ const captureSalesLead = async (req, res, next) => {
       );
     }
 
+    logger.info(`📥 Lead capture request: ${email} from ${channel || 'form'}`);
+
     // Check for existing prospect
     let prospect = await Prospect.findOne({ email: email.toLowerCase() });
 
     if (prospect) {
-      // Update existing prospect
+      // Update existing
       prospect.lastContactDate = new Date();
 
       if (monthly_enquiries) prospect.monthlyEnquiries = monthly_enquiries;
       if (current_crm) prospect.currentCRM = current_crm;
+      if (company_name) prospect.companyName = company_name;
+
       if (channels_needed) {
         prospect.channelsInterestedIn = Array.isArray(channels_needed)
           ? channels_needed
@@ -63,43 +68,43 @@ const captureSalesLead = async (req, res, next) => {
       }
 
       prospect.notes.push({
-        text: `Re-engaged via ${channel || 'website'}. Enquiries: ${monthly_enquiries || 'N/A'}/mo`,
+        text: `Re-engaged via ${channel || 'website form'}. Enquiries: ${monthly_enquiries || 'N/A'}/mo`,
         addedBy: 'system',
       });
 
       await prospect.save();
-      logger.info(`♻️ Existing prospect re-engaged: ${email}`);
+      logger.info(`♻️ Existing prospect updated: ${email}`);
 
       return res.json({
         success: true,
         prospect_id: prospect._id,
         returning: true,
-        message: `Welcome back, ${contact_name.split(' ')[0]}! We have your info.`,
+        message: `Welcome back, ${contact_name.split(' ')[0]}!`,
       });
     }
 
-    // ✅ FIXED: Create new prospect with CORRECT camelCase field names
+    // Create new prospect with CORRECT field mapping
     prospect = new Prospect({
-      companyName: company_name, // ✅ camelCase
-      contactName: contact_name, // ✅ camelCase
+      contactName: contact_name, // ✅ Map to camelCase
+      companyName: company_name, // ✅ Map to camelCase
       email: email.toLowerCase(),
       phone: phone,
       industry: industry || 'real_estate',
-      currentCRM: current_crm, // ✅ camelCase
-      monthlyEnquiries: monthly_enquiries, // ✅ camelCase
-      numberOfBranches: branch_count || 1, // ✅ camelCase
-      teamSize: team_size, // ✅ camelCase
+      currentCRM: current_crm, // ✅ Map to camelCase
+      monthlyEnquiries: monthly_enquiries, // ✅ Map to camelCase
+      numberOfBranches: branch_count || 1,
+      teamSize: team_size,
       painPoints: Array.isArray(pain_points)
         ? pain_points
         : pain_points
           ? [pain_points]
           : [],
-      channelsInterestedIn: Array.isArray(channels_needed) // ✅ camelCase
+      channelsInterestedIn: Array.isArray(channels_needed)
         ? channels_needed
         : channels_needed
           ? [channels_needed]
           : [],
-      preferredContactMethod: preferred_contact || 'email', // ✅ camelCase
+      preferredContactMethod: preferred_contact || 'email',
       source:
         channel === 'chat'
           ? 'website_chat'
@@ -128,13 +133,15 @@ const captureSalesLead = async (req, res, next) => {
     else if (monthly_enquiries > 200) score += 20;
     else if (monthly_enquiries > 100) score += 10;
     if (current_crm === 'reapit') score += 15;
-    if (pain_points?.includes('after_hours')) score += 15;
-    if (pain_points?.includes('response_time')) score += 10;
+    if (Array.isArray(pain_points) && pain_points.includes('after_hours'))
+      score += 15;
+    if (Array.isArray(pain_points) && pain_points.includes('response_time'))
+      score += 10;
     if (team_size > 5) score += 10;
     if (branch_count > 1) score += 10;
 
     prospect.notes.push({
-      text: `New lead via ${channel || 'website'}. Score: ${score}/100. Enquiries: ${monthly_enquiries || 0}/mo`,
+      text: `New lead via ${channel || 'website form'}. Score: ${score}/100. Enquiries: ${monthly_enquiries || 'N/A'}/mo`,
       addedBy: 'system',
     });
 
@@ -228,7 +235,7 @@ const getAvailableSlots = async (req, res, next) => {
     const now = new Date();
     const startDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 7; i++) {
       const date = new Date(startDate);
       date.setDate(date.getDate() + i);
 
@@ -297,7 +304,7 @@ const bookMeeting = async (req, res, next) => {
 
 // @desc    Update prospect status
 // @route   PATCH /api/v1/sales/prospect/:id/status
-// @access  Private (internal)
+// @access  Private
 const updateProspectStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
