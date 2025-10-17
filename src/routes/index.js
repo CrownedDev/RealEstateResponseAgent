@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const salesRoutes = require('./sales');
 
 // Import route modules
 const agentRoutes = require('./agents');
@@ -8,6 +7,8 @@ const propertyRoutes = require('./properties');
 const leadRoutes = require('./leads');
 const bookingRoutes = require('./bookings');
 const webhookRoutes = require('./webhooks');
+const salesRoutes = require('./sales');
+const prospectRoutes = require('./prospects.routes');
 
 // Mount routes
 router.use('/agents', agentRoutes);
@@ -16,6 +17,7 @@ router.use('/leads', leadRoutes);
 router.use('/bookings', bookingRoutes);
 router.use('/webhooks', webhookRoutes);
 router.use('/sales', salesRoutes);
+router.use('/prospects', prospectRoutes);
 
 // API info endpoint
 router.get('/', (req, res) => {
