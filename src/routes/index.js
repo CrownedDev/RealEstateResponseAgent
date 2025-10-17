@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const salesRoutes = require('./sales');
 
 // Import route modules
 const agentRoutes = require('./agents');
@@ -14,6 +15,7 @@ router.use('/properties', propertyRoutes);
 router.use('/leads', leadRoutes);
 router.use('/bookings', bookingRoutes);
 router.use('/webhooks', webhookRoutes);
+router.use('/sales', salesRoutes);
 
 // API info endpoint
 router.get('/', (req, res) => {
