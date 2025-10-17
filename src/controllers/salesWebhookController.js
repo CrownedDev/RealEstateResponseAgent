@@ -1,17 +1,16 @@
 // src/controllers/salesWebhookController.js
-// Webhooks for YOUR sales demo bot (capturing prospects for Royal Response)
+// FIXED VERSION - Correct field names matching Prospect model
 
-const Prospect = require('../models/Prospect'); // You'll need to create this
 const { AppError } = require('../middleware/errorHandler');
 const { logger } = require('../middleware/logger');
 
 // @desc    Capture lead from sales demo chatbot
 // @route   POST /api/v1/sales/capture-lead
-// @access  Public (no auth needed for sales demo)
+// @access  Public
 const captureSalesLead = async (req, res, next) => {
   try {
     const {
-      company_name,
+      company_name, // ← Input from frontend/Voiceflow (snake_case)
       contact_name,
       email,
       phone,
@@ -24,159 +23,196 @@ const captureSalesLead = async (req, res, next) => {
       monthly_enquiries,
       pain_points,
       channels_needed,
+      preferred_contact,
       conversation_id,
       channel,
+      message_count,
+      duration_seconds,
     } = req.body;
 
+    // Validate required fields
+    if (!contact_name || !email || !phone) {
+      return next(
+        new AppError('Contact name, email, and phone are required', 400)
+      );
+    }
+
     // Check for existing prospect
-    let prospect = await Prospect.findOne({ email });
+    let prospect = await Prospect.findOne({ email: email.toLowerCase() });
 
     if (prospect) {
       // Update existing prospect
       prospect.lastContactDate = new Date();
-      prospect.status = 're-engaged';
 
-      // Add note about re-engagement
+      if (monthly_enquiries) prospect.monthlyEnquiries = monthly_enquiries;
+      if (current_crm) prospect.currentCRM = current_crm;
+      if (channels_needed) {
+        prospect.channelsInterestedIn = Array.isArray(channels_needed)
+          ? channels_needed
+          : [channels_needed].filter(Boolean);
+      }
+
+      if (conversation_id) {
+        prospect.conversationData = {
+          messageCount: message_count,
+          durationSeconds: duration_seconds,
+          channel: channel,
+          completedAt: new Date(),
+        };
+        prospect.voiceflowConversationId = conversation_id;
+      }
+
       prospect.notes.push({
-        note: `Re-engaged via ${channel} demo. Monthly enquiries: ${monthly_enquiries}`,
-        type: 'general',
+        text: `Re-engaged via ${channel || 'website'}. Enquiries: ${monthly_enquiries || 'N/A'}/mo`,
+        addedBy: 'system',
       });
-    } else {
-      // Create new prospect
-      prospect = new Prospect({
-        company_name,
-        contact_name,
-        email,
-        phone,
-        website,
-        industry: industry || 'real_estate',
-        business_type,
-        current_crm,
-        company_size: team_size,
-        branch_count,
-        monthly_enquiries,
-        pain_points,
-        requirements: {
-          channels: channels_needed,
-        },
-        source: channel === 'webchat' ? 'website_chat' : channel,
-        status: 'new_lead',
-        conversation_id,
+
+      await prospect.save();
+      logger.info(`♻️ Existing prospect re-engaged: ${email}`);
+
+      return res.json({
+        success: true,
+        prospect_id: prospect._id,
+        returning: true,
+        message: `Welcome back, ${contact_name.split(' ')[0]}! We have your info.`,
       });
     }
 
-    // Calculate lead score
-    let score = 10; // Base score
+    // ✅ FIXED: Create new prospect with CORRECT camelCase field names
+    prospect = new Prospect({
+      companyName: company_name, // ✅ camelCase
+      contactName: contact_name, // ✅ camelCase
+      email: email.toLowerCase(),
+      phone: phone,
+      industry: industry || 'real_estate',
+      currentCRM: current_crm, // ✅ camelCase
+      monthlyEnquiries: monthly_enquiries, // ✅ camelCase
+      numberOfBranches: branch_count || 1, // ✅ camelCase
+      teamSize: team_size, // ✅ camelCase
+      painPoints: Array.isArray(pain_points)
+        ? pain_points
+        : pain_points
+          ? [pain_points]
+          : [],
+      channelsInterestedIn: Array.isArray(channels_needed) // ✅ camelCase
+        ? channels_needed
+        : channels_needed
+          ? [channels_needed]
+          : [],
+      preferredContactMethod: preferred_contact || 'email', // ✅ camelCase
+      source:
+        channel === 'chat'
+          ? 'website_chat'
+          : channel === 'phone'
+            ? 'phone'
+            : channel === 'whatsapp'
+              ? 'whatsapp'
+              : 'website_form',
+      status: 'new',
+      voiceflowConversationId: conversation_id,
+      conversationData: conversation_id
+        ? {
+            messageCount: message_count,
+            durationSeconds: duration_seconds,
+            channel: channel,
+            startedAt: new Date(),
+            completedAt: new Date(),
+          }
+        : undefined,
+      lastContactDate: new Date(),
+    });
 
+    // Calculate lead score
+    let score = 10;
     if (monthly_enquiries > 500) score += 30;
     else if (monthly_enquiries > 200) score += 20;
     else if (monthly_enquiries > 100) score += 10;
-
-    if (current_crm === 'reapit') score += 15; // Easier integration
-    if (pain_points?.after_hours) score += 15;
-    if (pain_points?.response_time) score += 10;
+    if (current_crm === 'reapit') score += 15;
+    if (pain_points?.includes('after_hours')) score += 15;
+    if (pain_points?.includes('response_time')) score += 10;
     if (team_size > 5) score += 10;
     if (branch_count > 1) score += 10;
 
-    prospect.lead_score = Math.min(score, 100);
+    prospect.notes.push({
+      text: `New lead via ${channel || 'website'}. Score: ${score}/100. Enquiries: ${monthly_enquiries || 0}/mo`,
+      addedBy: 'system',
+    });
 
     await prospect.save();
+    logger.info(`✅ Sales lead captured: ${email} - Score: ${score}`);
 
-    logger.info(`Sales lead captured: ${email} - Score: ${score}`);
-
-    res.json({
+    res.status(201).json({
       success: true,
       prospect_id: prospect._id,
-      lead_score: prospect.lead_score,
-      message: `Thanks ${contact_name.split(' ')[0]}! I've saved your information.`,
+      lead_score: score,
+      message: `Thanks ${contact_name.split(' ')[0]}! We'll contact you within 24 hours.`,
     });
   } catch (error) {
-    logger.error('Sales lead capture error:', error);
+    logger.error('❌ Capture sales lead error:', error);
+
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map((e) => e.message);
+      return next(
+        new AppError(`Validation failed: ${messages.join(', ')}`, 400)
+      );
+    }
+
     next(new AppError('Failed to capture lead', 500));
   }
 };
 
-// @desc    Calculate ROI for prospect
+// @desc    Calculate ROI
 // @route   POST /api/v1/sales/calculate-roi
 // @access  Public
 const calculateROI = async (req, res, next) => {
   try {
-    const { industry, monthly_enquiries, avg_transaction_value } = req.body;
+    const { industry = 'real_estate', monthly_enquiries } = req.body;
 
-    let calculations = {};
-
-    if (industry === 'real_estate') {
-      // Estate agent calculations
-      const afterHoursRate = 0.4; // 40% of enquiries are after hours
-      const missedLeadRate = 0.85; // 85% won't call back
-      const conversionRate = 0.025; // 2.5% of leads convert
-      const avgCommission = avg_transaction_value || 4500; // Average UK estate agent commission
-
-      const afterHoursEnquiries = Math.round(
-        monthly_enquiries * afterHoursRate
-      );
-      const missedLeads = Math.round(afterHoursEnquiries * missedLeadRate);
-      const potentialConversions = missedLeads * conversionRate * 12; // Annual
-      const revenueRecovered = Math.round(potentialConversions * avgCommission);
-      const systemCost = 12000; // £1000/month
-      const netBenefit = revenueRecovered - systemCost;
-      const roiPercentage = Math.round((netBenefit / systemCost) * 100);
-
-      calculations = {
-        after_hours_enquiries: afterHoursEnquiries,
-        missed_leads_monthly: missedLeads,
-        potential_annual_conversions: Math.round(potentialConversions),
-        revenue_recovered: revenueRecovered,
-        system_cost: systemCost,
-        net_benefit: netBenefit,
-        roi_percentage: roiPercentage,
-        payback_months:
-          systemCost > 0 ? Math.round(systemCost / (revenueRecovered / 12)) : 0,
-      };
-    } else if (industry === 'healthcare') {
-      // Healthcare calculations (different metrics)
-      const afterHoursRate = 0.3; // 30% of calls are after hours
-      const missedAppointmentValue = 150; // Average appointment value
-
-      const afterHoursEnquiries = Math.round(
-        monthly_enquiries * afterHoursRate
-      );
-      const potentialAppointments = afterHoursEnquiries * 0.7; // 70% book
-      const revenueRecovered = Math.round(
-        potentialAppointments * missedAppointmentValue * 12
-      );
-      const systemCost = 12000;
-
-      calculations = {
-        after_hours_enquiries: afterHoursEnquiries,
-        potential_appointments_monthly: potentialAppointments,
-        revenue_recovered: revenueRecovered,
-        system_cost: systemCost,
-        net_benefit: revenueRecovered - systemCost,
-        roi_percentage: Math.round(
-          ((revenueRecovered - systemCost) / systemCost) * 100
-        ),
-      };
-    } else {
-      // Generic calculation
-      const afterHoursRate = 0.35;
-      const afterHoursEnquiries = Math.round(
-        monthly_enquiries * afterHoursRate
-      );
-
-      calculations = {
-        after_hours_enquiries: afterHoursEnquiries,
-        message: "We'll create a custom ROI calculation for your industry",
-      };
+    if (!monthly_enquiries || monthly_enquiries < 1) {
+      return next(new AppError('Monthly enquiries required', 400));
     }
+
+    const calculations = {
+      real_estate: {
+        afterHoursPercentage: 0.4,
+        conversionRate: 0.15,
+        avgCommission: 6000,
+        systemMonthlyCost: 800,
+      },
+    };
+
+    const config = calculations[industry] || calculations.real_estate;
+
+    const afterHoursLost = Math.round(
+      monthly_enquiries * config.afterHoursPercentage
+    );
+    const viewingsPerMonth = Math.round(afterHoursLost * config.conversionRate);
+    const annualViewings = viewingsPerMonth * 12;
+    const annualSalesLost = Math.round(annualViewings * 0.1);
+    const commissionLost = annualSalesLost * config.avgCommission;
+    const annualSystemCost = config.systemMonthlyCost * 12;
+    const netBenefit = commissionLost - annualSystemCost;
+    const roiPercentage = Math.round((netBenefit / annualSystemCost) * 100);
 
     res.json({
       success: true,
       industry,
-      calculation: calculations,
+      monthlyEnquiries: monthly_enquiries,
+      afterHoursLost,
+      viewingsPerMonth,
+      annualSalesLost,
+      commissionLost,
+      systemCost: annualSystemCost,
+      netBenefit,
+      roiPercentage,
+      formatted: {
+        commissionLost: `£${commissionLost.toLocaleString()}`,
+        systemCost: `£${annualSystemCost.toLocaleString()}`,
+        netBenefit: `£${netBenefit.toLocaleString()}`,
+      },
     });
   } catch (error) {
-    logger.error('ROI calculation error:', error);
+    logger.error('Calculate ROI error:', error);
     next(new AppError('Failed to calculate ROI', 500));
   }
 };
@@ -186,24 +222,18 @@ const calculateROI = async (req, res, next) => {
 // @access  Public
 const getAvailableSlots = async (req, res, next) => {
   try {
-    const { week = 'current', timezone = 'Europe/London' } = req.query;
+    const { timezone = 'Europe/London' } = req.query;
 
-    // In production, this would integrate with your calendar
-    // For now, return mock availability
     const slots = [];
     const now = new Date();
-    const startDate =
-      week === 'next' ? new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) : now;
+    const startDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
-    // Generate slots for next 5 business days
     for (let i = 0; i < 5; i++) {
       const date = new Date(startDate);
       date.setDate(date.getDate() + i);
 
-      // Skip weekends
       if (date.getDay() === 0 || date.getDay() === 6) continue;
 
-      // Morning and afternoon slots
       const dateStr = date.toISOString().split('T')[0];
       slots.push(
         { date: dateStr, time: '10:00', available: true, duration_minutes: 30 },
@@ -216,7 +246,7 @@ const getAvailableSlots = async (req, res, next) => {
     res.json({
       success: true,
       timezone,
-      slots: slots.slice(0, 12), // Return max 12 slots
+      slots: slots.slice(0, 12),
     });
   } catch (error) {
     logger.error('Get availability error:', error);
@@ -224,7 +254,7 @@ const getAvailableSlots = async (req, res, next) => {
   }
 };
 
-// @desc    Book a demo meeting
+// @desc    Book a meeting
 // @route   POST /api/v1/sales/book-meeting
 // @access  Public
 const bookMeeting = async (req, res, next) => {
@@ -236,29 +266,17 @@ const bookMeeting = async (req, res, next) => {
       return next(new AppError('Prospect not found', 404));
     }
 
-    // Update prospect status
     prospect.status = 'demo_scheduled';
-    prospect.meeting = {
-      scheduled_date: new Date(`${date}T${time}:00`),
-      type,
-      status: 'scheduled',
-    };
+    prospect.demoScheduledDate = new Date(`${date}T${time}:00`);
 
-    // Add note
     prospect.notes.push({
-      note: `Demo scheduled for ${date} at ${time}`,
-      type: 'meeting',
+      text: `Demo scheduled for ${date} at ${time} (${type})`,
+      addedBy: 'system',
     });
 
     await prospect.save();
 
-    // In production, you would:
-    // 1. Create calendar event (Google Calendar API)
-    // 2. Send confirmation email
-    // 3. Send calendar invite
-    // 4. Set up reminder notifications
-
-    logger.info(`Meeting booked for prospect: ${prospect.email}`);
+    logger.info(`📅 Meeting booked: ${prospect.email} - ${date} ${time}`);
 
     res.json({
       success: true,
@@ -279,7 +297,7 @@ const bookMeeting = async (req, res, next) => {
 
 // @desc    Update prospect status
 // @route   PATCH /api/v1/sales/prospect/:id/status
-// @access  Private (for your internal use)
+// @access  Private (internal)
 const updateProspectStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -294,24 +312,20 @@ const updateProspectStatus = async (req, res, next) => {
 
     if (notes) {
       prospect.notes.push({
-        note: notes,
-        type: 'general',
-        created_by: 'system',
+        text: notes,
+        addedBy: 'admin',
       });
     }
 
-    // Handle status-specific logic
     if (status === 'won') {
-      prospect.activated = true;
-      prospect.activation_date = new Date();
-      // Create new Agent record
-      // Send onboarding emails
+      prospect.contractStartDate = new Date();
     } else if (status === 'lost') {
-      prospect.lost_reason = req.body.lost_reason;
-      prospect.lost_notes = req.body.lost_notes;
+      prospect.lostReason = req.body.lost_reason;
     }
 
     await prospect.save();
+
+    logger.info(`Prospect status updated: ${id} -> ${status}`);
 
     res.json({
       success: true,

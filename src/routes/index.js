@@ -8,7 +8,6 @@ const leadRoutes = require('./leads');
 const bookingRoutes = require('./bookings');
 const webhookRoutes = require('./webhooks');
 const salesRoutes = require('./sales');
-const prospectRoutes = require('./prospects.routes');
 
 // Mount routes
 router.use('/agents', agentRoutes);
@@ -17,7 +16,6 @@ router.use('/leads', leadRoutes);
 router.use('/bookings', bookingRoutes);
 router.use('/webhooks', webhookRoutes);
 router.use('/sales', salesRoutes);
-router.use('/prospects', prospectRoutes);
 
 // API info endpoint
 router.get('/', (req, res) => {
