@@ -7,9 +7,11 @@ const {
   getAvailableSlots,
   bookMeeting,
   updateProspectStatus,
+  lookupProspectByVoiceflowId,
 } = require('../controllers/salesWebhookController');
 
 // Public endpoints (no auth required for sales demo bot)
+router.get('/voiceflow/:prospectId', lookupProspectByVoiceflowId);
 router.post('/capture-lead', captureSalesLead);
 router.post('/calculate-roi', calculateROI);
 router.get('/availability', getAvailableSlots);
