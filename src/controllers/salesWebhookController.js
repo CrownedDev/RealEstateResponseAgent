@@ -127,7 +127,25 @@ const captureSalesLead = async (req, res, next) => {
     if (monthly_enquiries > 500) score += 30;
     else if (monthly_enquiries > 200) score += 20;
     else if (monthly_enquiries > 100) score += 10;
-    if (current_crm === 'reapit') score += 15;
+
+    const crmScores = {
+      other: 10,
+      alto: 20,
+      jupix: 20,
+      expert_agent: 18,
+      street: 18,
+      veco: 15,
+      reapit: 15,
+      dezrez: 12,
+      rex: 12,
+      vebra: 12,
+      agent_os: 12,
+      salesforce: 10,
+      hubspot: 10,
+      zoho: 8,
+      none: 5,
+    };
+    score += crmScores[current_crm] || 10;
 
     if (challenges) {
       // If challenges provided, add them to notes
