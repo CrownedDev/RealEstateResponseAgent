@@ -5,6 +5,23 @@ const mongoose = require('mongoose');
 
 const prospectSchema = new mongoose.Schema(
   {
+    voiceflowUserId: {
+      type: String,
+      trim: true,
+      index: true, // Index for fast lookups
+    },
+    voiceflowConversationId: {
+      type: String,
+      trim: true,
+    },
+    totalInteractions: {
+      type: Number,
+      default: 0,
+    },
+    lastInteractionDate: {
+      type: Date,
+    },
+
     // Contact Information
     contactName: {
       type: String,
@@ -221,6 +238,7 @@ prospectSchema.index({ nextFollowUpDate: 1 });
 // Compound indexes for common queries
 prospectSchema.index({ status: 1, createdAt: -1 });
 prospectSchema.index({ assignedTo: 1, status: 1 });
+prospectSchema.index({ voiceflowUserId: 1 });
 
 // Virtual for display name
 prospectSchema.virtual('displayName').get(function () {

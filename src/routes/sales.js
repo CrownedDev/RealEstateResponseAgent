@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const {
+  lookupProspectByVoiceflowId,
   captureSalesLead,
   calculateROI,
   getAvailableSlots,
@@ -11,7 +12,7 @@ const {
 } = require('../controllers/salesWebhookController');
 
 // Public endpoints (no auth required for sales demo bot)
-router.get('/voiceflow/:prospectId', lookupProspectByVoiceflowId);
+router.get('/voiceflow/:UserId', lookupProspectByVoiceflowId);
 router.post('/capture-lead', captureSalesLead);
 router.post('/calculate-roi', calculateROI);
 router.get('/availability', getAvailableSlots);

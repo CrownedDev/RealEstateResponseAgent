@@ -45,7 +45,7 @@ router.post('/capture', async (req, res) => {
 
       return res.json({
         success: true,
-        prospect_id: prospect._id,
+        user_id: user._id,
         message: 'Welcome back! We have your information.',
       });
     }
@@ -64,14 +64,14 @@ router.post('/capture', async (req, res) => {
     });
 
     console.log('✅ New prospect captured:', {
-      id: prospect._id,
+      id: user._id,
       email: prospect.email,
       company: prospect.company_name,
     });
 
     res.status(201).json({
       success: true,
-      prospect_id: prospect._id,
+      user_id: user._id,
       message: "Thank you! We'll be in touch soon.",
     });
   } catch (error) {
@@ -118,7 +118,7 @@ router.post('/capture-lead', async (req, res) => {
 
       return res.json({
         success: true,
-        prospect_id: prospect._id,
+        user_id: user._id,
         existing: true,
         message: `Welcome back, ${contact_name || 'there'}!`,
       });
@@ -143,14 +143,14 @@ router.post('/capture-lead', async (req, res) => {
     });
 
     console.log('✅ Voiceflow lead captured:', {
-      id: prospect._id,
+      id: user._id,
       name: contact_name,
       channel,
     });
 
     res.status(201).json({
       success: true,
-      prospect_id: prospect._id,
+      user_id: user._id,
       message: `Thanks ${contact_name}! We'll be in touch within 24 hours.`,
     });
   } catch (error) {
@@ -305,7 +305,7 @@ router.post('/book-meeting', async (req, res) => {
 
     res.json({
       success: true,
-      prospect_id: prospect._id,
+      user_id: user._id,
       meeting_confirmed: true,
       message: "Meeting booked! You'll receive a calendar invite shortly.",
     });

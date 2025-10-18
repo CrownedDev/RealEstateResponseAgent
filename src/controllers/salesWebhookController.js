@@ -4,16 +4,16 @@ const { AppError } = require('../middleware/errorHandler');
 const { logger } = require('../middleware/logger');
 
 // @desc    Look up prospect by Voiceflow ID
-// @route   GET /api/v1/sales/voiceflow/:prospectId
+// @route   GET /api/v1/sales/voiceflow/:UserId
 // @access  Public
 const lookupProspectByVoiceflowId = async (req, res, next) => {
   try {
-    const { prospectId } = req.params;
+    const { UserId } = req.params;
 
-    logger.info(`🔍 Voiceflow lookup: ${prospectId}`);
+    logger.info(`🔍 Voiceflow lookup: ${UserId}`);
 
     const prospect = await Prospect.findOne({
-      voiceflowProspectId: prospectId,
+      voiceflowUserId: UserId,
     }).select(
       'contactName companyName email phone currentCRM monthlyEnquiries status totalInteractions'
     );
@@ -39,7 +39,7 @@ const lookupProspectByVoiceflowId = async (req, res, next) => {
       success: true,
       found: true,
       prospect: {
-        id: prospect._id,
+        id: user._id,
         contactName: prospect.contactName,
         companyName: prospect.companyName,
         email: prospect.email,
@@ -72,7 +72,7 @@ const captureSalesLead = async (req, res, next) => {
     const current_crm = req.body.current_crm || req.body.crm;
     const monthly_enquiries = req.body.monthly_enquiries;
     const challenges = req.body.challenges;
-    const voiceflow_prospect_id = req.body.voiceflow_prospect_id;
+    const voiceflow_user_id = req.body.voiceflow_user_id;
 
     const {
       industry,
@@ -96,7 +96,7 @@ const captureSalesLead = async (req, res, next) => {
     // Check for existing prospect
     let prospect = await Prospect.findOne({
       $or: [
-        { voiceflowProspectId: voiceflow_prospect_id },
+        { voiceflowUserId: voiceflow_user_id },
         { email: email?.toLowerCase() },
         { phone: phone },
       ].filter(Boolean),
@@ -131,8 +131,8 @@ const captureSalesLead = async (req, res, next) => {
       // Update existing
       prospect.lastContactDate = new Date();
 
-      if (voiceflow_prospect_id && !prospect.voiceflowProspectId) {
-        prospect.voiceflowProspectId = voiceflow_prospect_id;
+      if (voiceflow_user_id && !prospect.voiceflowUserId) {
+        prospect.voiceflowUserId = voiceflow_user_id;
       }
       prospect.totalInteractions = (prospect.totalInteractions || 0) + 1;
       prospect.lastInteractionDate = new Date();
@@ -167,8 +167,8 @@ const captureSalesLead = async (req, res, next) => {
 
       return res.json({
         success: true,
-        prospect_id: prospect._id,
-        voiceflow_prospect_id: prospect.voiceflowProspectId, // ← ADD THIS
+        user_id: user._id,
+        voiceflow_user_id: prospect.voiceflowUserId, // ← ADD THIS
         returning: true,
         message: `Welcome back, ${contact_name.split(' ')[0]}!`,
       });
@@ -176,7 +176,7 @@ const captureSalesLead = async (req, res, next) => {
       // ← ADD THIS 'else {'
       // Create new prospect with CORRECT field mapping
       prospect = new Prospect({
-        voiceflowProspectId: voiceflow_prospect_id, // ← ADD THIS
+        voiceflowUserId: voiceflow_user_id, // ← ADD THIS
         contactName: contact_name,
         companyName: company_name,
         email: email.toLowerCase(),
@@ -231,8 +231,8 @@ const captureSalesLead = async (req, res, next) => {
 
       res.status(201).json({
         success: true,
-        prospect_id: prospect._id,
-        voiceflow_prospect_id: prospect.voiceflowProspectId, // ← ADD THIS
+        user_id: user._id,
+        voiceflow_user_id: prospect.voiceflowUserId, // ← ADD THIS
         existing: false, // ← ADD THIS
         lead_score: score,
         message: `Thanks ${contact_name.split(' ')[0]}! We'll contact you within 24 hours.`,
@@ -350,9 +350,9 @@ const getAvailableSlots = async (req, res, next) => {
 // @access  Public
 const bookMeeting = async (req, res, next) => {
   try {
-    const { prospect_id, date, time, type = 'video_call' } = req.body;
+    const { user_id, date, time, type = 'video_call' } = req.body;
 
-    const prospect = await Prospect.findById(prospect_id);
+    const prospect = await Prospect.findById(user_id);
     if (!prospect) {
       return next(new AppError('Prospect not found', 404));
     }
@@ -429,6 +429,7 @@ const updateProspectStatus = async (req, res, next) => {
 };
 
 module.exports = {
+  lookupProspectByVoiceflowId,
   captureSalesLead,
   calculateROI,
   getAvailableSlots,
