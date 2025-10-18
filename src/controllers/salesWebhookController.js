@@ -44,6 +44,31 @@ const captureSalesLead = async (req, res, next) => {
     // Check for existing prospect
     let prospect = await Prospect.findOne({ email: email.toLowerCase() });
 
+    // Calculate lead score
+    let score = 10;
+    if (monthly_enquiries > 500) score += 30;
+    else if (monthly_enquiries > 200) score += 20;
+    else if (monthly_enquiries > 100) score += 10;
+
+    const crmScores = {
+      other: 10,
+      alto: 20,
+      jupix: 20,
+      expert_agent: 18,
+      street: 18,
+      veco: 15,
+      reapit: 15,
+      dezrez: 12,
+      rex: 12,
+      vebra: 12,
+      agent_os: 12,
+      salesforce: 10,
+      hubspot: 10,
+      zoho: 8,
+      none: 5,
+    };
+    score += crmScores[current_crm] || 10;
+
     if (prospect) {
       // Update existing
       prospect.lastContactDate = new Date();
@@ -86,14 +111,15 @@ const captureSalesLead = async (req, res, next) => {
 
     // Create new prospect with CORRECT field mapping
     prospect = new Prospect({
-      contactName: contact_name, // ✅ Map to camelCase
-      companyName: company_name, // ✅ Map to camelCase
+      contactName: contact_name,
+      companyName: company_name,
       email: email.toLowerCase(),
       phone: phone,
       industry: industry || 'real_estate',
-
-      currentCRM: current_crm, // ✅ Map to camelCase
-      monthlyEnquiries: monthly_enquiries, // ✅ Map to camelCase
+      currentCRM: current_crm,
+      monthlyEnquiries: monthly_enquiries,
+      numberOfBranches: branch_count || 1,
+      teamSize: team_size || 1,
       channelsInterestedIn: Array.isArray(channels_needed)
         ? channels_needed
         : channels_needed
@@ -122,30 +148,29 @@ const captureSalesLead = async (req, res, next) => {
       lastContactDate: new Date(),
     });
 
-    // Calculate lead score
-    let score = 10;
-    if (monthly_enquiries > 500) score += 30;
-    else if (monthly_enquiries > 200) score += 20;
-    else if (monthly_enquiries > 100) score += 10;
+    // Score already calculated above!
 
-    const crmScores = {
-      other: 10,
-      alto: 20,
-      jupix: 20,
-      expert_agent: 18,
-      street: 18,
-      veco: 15,
-      reapit: 15,
-      dezrez: 12,
-      rex: 12,
-      vebra: 12,
-      agent_os: 12,
-      salesforce: 10,
-      hubspot: 10,
-      zoho: 8,
-      none: 5,
-    };
-    score += crmScores[current_crm] || 10;
+    if (challenges) {
+      prospect.notes.push({
+        text: `Initial challenges: ${challenges}`,
+        addedBy: 'system',
+      });
+    } else {
+      prospect.notes.push({
+        text: `New lead via ${channel || 'website form'}. Score: ${score}/100. Enquiries: ${monthly_enquiries || 'N/A'}/mo`,
+        addedBy: 'system',
+      });
+    }
+
+    await prospect.save();
+    logger.info(`✅ Sales lead captured: ${email} - Score: ${score}`);
+
+    res.status(201).json({
+      success: true,
+      prospect_id: prospect._id,
+      lead_score: score, // ✅ Score returned
+      message: `Thanks ${contact_name.split(' ')[0]}! We'll contact you within 24 hours.`,
+    });
 
     if (challenges) {
       // If challenges provided, add them to notes
