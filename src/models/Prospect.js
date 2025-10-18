@@ -57,23 +57,7 @@ const prospectSchema = new mongoose.Schema(
       type: Number,
       min: 0,
     },
-    numberOfBranches: {
-      type: Number,
-      default: 1,
-      min: 1,
-    },
-    teamSize: {
-      type: Number,
-      min: 1,
-    },
 
-    // Pain Points & Needs
-    painPoints: [
-      {
-        type: String,
-        trim: true,
-      },
-    ],
     channelsInterestedIn: [
       {
         type: String,

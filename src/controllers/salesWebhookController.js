@@ -60,9 +60,10 @@ const lookupProspectByVoiceflowId = async (req, res, next) => {
 // @desc    Capture lead from sales demo chatbot
 // @route   POST /api/v1/sales/capture-lead
 // @access  Public
-const captureSalesLead = async (req, res) => {
-  const { voiceflow_prospect_id, email, phone /* ... */ } = req.body;
+const captureSalesLead = async (req, res, next) => {
+  // ← CHANGED: Added 'next'
   try {
+    // ← REMOVED: Line 2 with destructuring
     // Support BOTH Voiceflow (snake_case) AND frontend form (alternative names)
     const company_name = req.body.company_name || req.body.company;
     const contact_name = req.body.contact_name || req.body.name;
@@ -71,16 +72,10 @@ const captureSalesLead = async (req, res) => {
     const current_crm = req.body.current_crm || req.body.crm;
     const monthly_enquiries = req.body.monthly_enquiries;
     const challenges = req.body.challenges;
-
     const voiceflow_prospect_id = req.body.voiceflow_prospect_id;
 
     const {
-      website,
       industry,
-      business_type,
-      team_size,
-      branch_count,
-      pain_points,
       channels_needed,
       preferred_contact,
       conversation_id,
@@ -173,97 +168,76 @@ const captureSalesLead = async (req, res) => {
       return res.json({
         success: true,
         prospect_id: prospect._id,
+        voiceflow_prospect_id: prospect.voiceflowProspectId, // ← ADD THIS
         returning: true,
         message: `Welcome back, ${contact_name.split(' ')[0]}!`,
       });
-    }
-
-    // Create new prospect with CORRECT field mapping
-    prospect = new Prospect({
-      contactName: contact_name,
-      companyName: company_name,
-      email: email.toLowerCase(),
-      phone: phone,
-      industry: industry || 'real_estate',
-      currentCRM: current_crm,
-      monthlyEnquiries: monthly_enquiries,
-      numberOfBranches: branch_count || 1,
-      teamSize: team_size || 1,
-      channelsInterestedIn: Array.isArray(channels_needed)
-        ? channels_needed
-        : channels_needed
-          ? [channels_needed]
-          : [],
-      preferredContactMethod: preferred_contact || 'email',
-      source:
-        channel === 'chat'
-          ? 'website_chat'
-          : channel === 'phone'
-            ? 'phone'
-            : channel === 'whatsapp'
-              ? 'whatsapp'
-              : 'website_form',
-      status: 'new',
-      voiceflowConversationId: conversation_id,
-      conversationData: conversation_id
-        ? {
-            messageCount: message_count,
-            durationSeconds: duration_seconds,
-            channel: channel,
-            startedAt: new Date(),
-            completedAt: new Date(),
-          }
-        : undefined,
-      lastContactDate: new Date(),
-    });
-
-    // Score already calculated above!
-
-    if (challenges) {
-      prospect.notes.push({
-        text: `Initial challenges: ${challenges}`,
-        addedBy: 'system',
-      });
     } else {
-      prospect.notes.push({
-        text: `New lead via ${channel || 'website form'}. Score: ${score}/100. Enquiries: ${monthly_enquiries || 'N/A'}/mo`,
-        addedBy: 'system',
+      // ← ADD THIS 'else {'
+      // Create new prospect with CORRECT field mapping
+      prospect = new Prospect({
+        voiceflowProspectId: voiceflow_prospect_id, // ← ADD THIS
+        contactName: contact_name,
+        companyName: company_name,
+        email: email.toLowerCase(),
+        phone: phone,
+        industry: industry || 'real_estate',
+        currentCRM: current_crm,
+        monthlyEnquiries: monthly_enquiries,
+        totalInteractions: 1, // ← ADD THIS
+        lastInteractionDate: new Date(), // ← ADD THIS
+        channelsInterestedIn: Array.isArray(channels_needed)
+          ? channels_needed
+          : channels_needed
+            ? [channels_needed]
+            : [],
+        preferredContactMethod: preferred_contact || 'email',
+        source:
+          channel === 'chat'
+            ? 'website_chat'
+            : channel === 'phone'
+              ? 'phone'
+              : channel === 'whatsapp'
+                ? 'whatsapp'
+                : 'website_form',
+        status: 'new',
+        voiceflowConversationId: conversation_id,
+        conversationData: conversation_id
+          ? {
+              messageCount: message_count,
+              durationSeconds: duration_seconds,
+              channel: channel,
+              startedAt: new Date(),
+              completedAt: new Date(),
+            }
+          : undefined,
+        lastContactDate: new Date(),
       });
-    }
 
-    await prospect.save();
-    logger.info(`✅ Sales lead captured: ${email} - Score: ${score}`);
+      if (challenges) {
+        prospect.notes.push({
+          text: `Initial challenges: ${challenges}`,
+          addedBy: 'system',
+        });
+      } else {
+        prospect.notes.push({
+          text: `New lead via ${channel || 'website form'}. Score: ${score}/100. Enquiries: ${monthly_enquiries || 'N/A'}/mo`,
+          addedBy: 'system',
+        });
+      }
 
-    res.status(201).json({
-      success: true,
-      prospect_id: prospect._id,
-      lead_score: score, // ✅ Score returned
-      message: `Thanks ${contact_name.split(' ')[0]}! We'll contact you within 24 hours.`,
-    });
+      await prospect.save();
+      logger.info(`✅ Sales lead captured: ${email} - Score: ${score}`);
 
-    if (challenges) {
-      // If challenges provided, add them to notes
-      prospect.notes.push({
-        text: `Initial challenges: ${challenges}`,
-        addedBy: 'system',
+      res.status(201).json({
+        success: true,
+        prospect_id: prospect._id,
+        voiceflow_prospect_id: prospect.voiceflowProspectId, // ← ADD THIS
+        existing: false, // ← ADD THIS
+        lead_score: score,
+        message: `Thanks ${contact_name.split(' ')[0]}! We'll contact you within 24 hours.`,
       });
-    } else {
-      // Otherwise add the score-based note
-      prospect.notes.push({
-        text: `New lead via ${channel || 'website form'}. Score: ${score}/100. Enquiries: ${monthly_enquiries || 'N/A'}/mo`,
-        addedBy: 'system',
-      });
-    }
-
-    await prospect.save();
-    logger.info(`✅ Sales lead captured: ${email} - Score: ${score}`);
-
-    res.status(201).json({
-      success: true,
-      prospect_id: prospect._id,
-      lead_score: score,
-      message: `Thanks ${contact_name.split(' ')[0]}! We'll contact you within 24 hours.`,
-    });
+    } // ← ADD THIS closing brace for 'else'
   } catch (error) {
     logger.error('❌ Capture sales lead error:', error);
 
